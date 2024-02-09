@@ -1,0 +1,543 @@
+
+
+
+Report ZT_alvgrid.
+*----------------------------------------------------------------------*
+
+
+INCLUDE zt_incl_top.
+
+INCLUDE zt_incl1.
+
+START-OF-SELECTION.
+
+    SELECT
+    a~uuid,
+    a~messageid,
+    a~sender,
+    a~scope,
+    a~messagegroupid,
+    a~messagetype,
+    a~keytype,
+    a~deleted,
+    a~sender_uuid,
+    a~delete_uuid,
+    a~status,
+    a~error_text,
+    a~idoc_status_counter,
+    a~crdat,
+    a~crtim,
+    a~crnam,
+    a~chdat,
+    a~chtim,
+    a~chnam,
+
+    b~parent_uuid,
+    b~profile_id,
+    b~lres,
+    b~action,
+    b~http_code,
+    b~response_time,
+    b~error_code,
+    b~error_request_id,
+    b~request,
+    b~response
+    FROM zutf_api_aws_sqs AS a
+    INNER JOIN zutf_api_aws_log AS b
+    ON a~uuid = b~uuid
+    INTO TABLE @gt_utf_api_aws
+    UP TO @p_max_ht ROWS
+      WHERE a~sender IN @s_sender
+      AND   a~scope  IN @s_scope
+      AND   a~messagetype IN @s_mes_ty
+      AND   a~keytype IN @s_key_ty
+      AND   a~status IN @s_status
+      AND   a~crdat IN @s_crdat
+      AND   a~crtim IN @s_crtim
+      AND   a~crnam IN @s_crnam
+      AND   a~chdat IN @s_chdat
+      AND   a~chtim IN @s_chtim
+      AND   a~chnam IN @s_chnam
+      AND   b~lres  IN @s_lres
+      AND   b~action IN @s_action
+      ORDER BY a~uuid
+      .
+
+end-of-SELECTION.
+call SCREEN 100.
+
+          " Used for Display, outputs, downloads, job and so on
+
+
+
+*&---------------------------------------------------------------------*
+*& Include          ZT_INCL_TOP
+*&---------------------------------------------------------------------*
+
+TABLES: zutf_api_aws_sqs.
+*TABLES: zutf_api_aws_log.
+DATA: gv_lres   TYPE zutf_api_aws_log-lres,
+      gv_action TYPE zutf_api_aws_log-action.
+
+DATA w_fcat            TYPE lvc_s_fcat.
+DATA t_fcat            TYPE lvc_t_fcat.
+
+DATA : gv_index   TYPE sy-tabix,
+       gv_fld     TYPE lvc_fname,
+       gv_title   TYPE c LENGTH 255,
+       gv_mid     TYPE char100,
+       gv_uuid    TYPE char32,
+       gv_sender  TYPE char10,
+       gv_crdat   TYPE dats,
+       gv_crnam   TYPE char12,
+       gv_crtim   TYPE tims,
+       gv_mtype   TYPE char10,
+       gv_scope   TYPE char40,
+       gv_lres1   TYPE char20,
+       gv_action1 TYPE char35,
+       gv_restim  TYPE string,
+       gv_hcode   TYPE int4.
+DATA : json_string1 TYPE string,
+       json_string  TYPE string.
+
+TYPES: BEGIN OF gty_utf_api_aws,
+         uuid                TYPE zutf_api_aws_sqs-uuid,
+         messageid           TYPE zutf_api_aws_sqs-messageid,
+         sender              TYPE zutf_api_aws_sqs-sender,
+         scope               TYPE zutf_api_aws_sqs-scope,
+         messagegroupid      TYPE zutf_api_aws_sqs-messagegroupid,
+         messagetype         TYPE zutf_api_aws_sqs-messagetype,
+         keytype             TYPE zutf_api_aws_sqs-keytype,
+         deleted             TYPE zutf_api_aws_sqs-deleted,
+         sender_uuid         TYPE zutf_api_aws_sqs-sender_uuid,
+         delete_uuid         TYPE zutf_api_aws_sqs-delete_uuid,
+         status              TYPE zutf_api_aws_sqs-status,
+         error_text          TYPE zutf_api_aws_sqs-error_text,
+         idoc_status_counter TYPE zutf_api_aws_sqs-idoc_status_counter,
+         crdat               TYPE zutf_api_aws_sqs-crdat,
+         crtim               TYPE zutf_api_aws_sqs-crtim,
+         crnam               TYPE zutf_api_aws_sqs-crnam,
+         chdat               TYPE zutf_api_aws_sqs-chdat,
+         chtim               TYPE zutf_api_aws_sqs-chtim,
+         chnam               TYPE zutf_api_aws_sqs-chnam,
+
+         parent_uuid         TYPE zutf_api_aws_log-parent_uuid,
+         profile_id          TYPE zutf_api_aws_log-profile_id,
+         lres                TYPE zutf_api_aws_log-lres,
+         action              TYPE zutf_api_aws_log-action,
+         http_code           TYPE zutf_api_aws_log-http_code,
+         response_time       TYPE zutf_api_aws_log-response_time,
+         error_code          TYPE zutf_api_aws_log-error_code,
+         error_request_id    TYPE zutf_api_aws_log-error_request_id,
+         request             TYPE zutf_api_aws_log-request,
+         response            TYPE zutf_api_aws_log-response,
+       END OF gty_utf_api_aws.
+
+DATA: gt_utf_api_aws TYPE STANDARD TABLE OF gty_utf_api_aws,
+      go_grid        TYPE REF TO cl_gui_alv_grid  ##NEEDED,
+      go_cont        TYPE REF TO cl_gui_custom_container  ##NEEDED.
+
+TYPES: gtt_utf_api_aws TYPE STANDARD TABLE OF gty_utf_api_aws.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-b01.
+
+  SELECT-OPTIONS: s_sender FOR zutf_api_aws_sqs-sender,
+                  s_scope  FOR zutf_api_aws_sqs-scope,
+                  s_mes_ty FOR zutf_api_aws_sqs-messagetype,
+                  s_key_ty FOR zutf_api_aws_sqs-keytype,
+                  s_status FOR zutf_api_aws_sqs-status.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-b02.
+
+  SELECT-OPTIONS: s_crdat FOR zutf_api_aws_sqs-crdat,
+                  s_crtim FOR zutf_api_aws_sqs-crtim,
+                  s_crnam FOR zutf_api_aws_sqs-crnam,
+                  s_chdat FOR zutf_api_aws_sqs-chdat,
+                  s_chtim FOR zutf_api_aws_sqs-chtim,
+                  s_chnam FOR zutf_api_aws_sqs-chnam.
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-b03.
+
+  SELECT-OPTIONS: s_lres   FOR gv_lres,
+                  s_action FOR gv_action.
+
+SELECTION-SCREEN END OF BLOCK b3.
+
+SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE TEXT-b04.
+
+  PARAMETERS: p_max_ht TYPE num10 DEFAULT '10000'.
+
+SELECTION-SCREEN END OF BLOCK b4.
+
+
+*&---------------------------------------------------------------------*
+*& Include ZT_INCL1
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&  Include           ZUTF_VIEW_SQS_LOG_DETAILS_M01
+*&---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+*       CLASS lcl_handle_events DEFINITION
+*---------------------------------------------------------------------*
+* Define a local class for handling events of cl_salv_table
+*---------------------------------------------------------------------*
+
+
+
+CLASS lcl_handle_events DEFINITION FINAL.
+  PUBLIC SECTION.
+    METHODS:
+      handle_hotspot_click FOR EVENT hotspot_click OF cl_gui_alv_grid
+        IMPORTING e_row_id e_column_id.
+
+ENDCLASS.                    "lcl_handle_events DEFINITION
+
+*---------------------------------------------------------------------*
+*       CLASS lcl_handle_events IMPLEMENTATION
+*---------------------------------------------------------------------*
+*Implement the events for handling the events of cl_salv_table
+*---------------------------------------------------------------------*
+CLASS lcl_handle_events IMPLEMENTATION.
+
+  METHOD handle_hotspot_click.
+    PERFORM handle_hotspot_click USING e_row_id e_column_id.         " Double click action
+  ENDMETHOD.                   "on_double_click
+
+ENDCLASS.                    "lcl_handle_events IMPLEMENTATION
+
+MODULE status_0100 OUTPUT.
+
+  SET PF-STATUS 'ZSTATUS_100'.
+  SET TITLEBAR 'ZTITLE'.
+
+  " Subroutine to prepare final data
+  PERFORM prepare_alv_output CHANGING go_cont gt_utf_api_aws.
+
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+
+MODULE user_command_0100 INPUT.
+
+  CASE sy-ucomm.
+***    WHEN 'OUTPUT'.
+***      gv_output_screen = '200'.
+***      gv_preview_mode = abap_false.
+***      CLEAR: gt_output_selected.
+***      PERFORM output_selected_rows CHANGING gt_output_selected.
+***      IF lines( gt_output_selected ) > 0.
+***        CALL SCREEN 200.
+***      ENDIF.
+***    WHEN 'PREVIEW'.
+***      gv_preview_mode = abap_true.
+***      CLEAR: gt_output_selected.
+***      PERFORM output_selected_rows CHANGING gt_output_selected.
+    WHEN '&F03' OR '&F12'.
+      LEAVE TO SCREEN 0.
+    WHEN '&F15'.
+      LEAVE PROGRAM.
+    WHEN OTHERS.
+      LEAVE PROGRAM.
+  ENDCASE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  PREPARE_ALV_OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_GO_CONT  text
+*      <--P_GT_UTF_API_AWS  text
+*----------------------------------------------------------------------*
+FORM prepare_alv_output  CHANGING co_cont   TYPE REF TO cl_gui_custom_container
+                                 ct_output TYPE gtt_utf_api_aws.
+
+  DATA:
+*        lt_output_200     TYPE gtt_output_alv_200,
+    Ct_exclude        TYPE ui_functions,
+    ls_layout         TYPE lvc_s_layo,
+    ls_variant        TYPE disvariant,
+    lo_events_handler TYPE REF TO lcl_handle_events.
+
+  FIELD-SYMBOLS <lt_alv_data> TYPE ANY TABLE.
+
+  CHECK co_cont IS INITIAL.
+
+  co_cont = NEW #( container_name = 'CONT_100' ).
+
+  go_grid = NEW #( i_parent = co_cont ).
+  lo_events_handler = NEW #( ).
+  SET HANDLER: lo_events_handler->handle_hotspot_click FOR go_grid.
+
+  FREE: t_fcat[], Ct_exclude[], ls_layout.
+
+  PERFORM build_fieldcat CHANGING t_fcat.
+  PERFORM exclude_tb_functions CHANGING Ct_exclude.
+
+  ls_variant-report   = sy-cprog.
+  ls_variant-username = sy-uname.
+
+  ls_layout-zebra      = abap_true.
+  ls_layout-cwidth_opt = abap_true.
+  ls_layout-stylefname = 'CELLTAB'.
+  ls_layout-sel_mode   = 'A'.
+
+  CALL METHOD go_grid->set_table_for_first_display
+    EXPORTING
+      it_toolbar_excluding = Ct_exclude
+      is_variant           = ls_variant
+      i_save               = 'A'
+      i_default            = abap_true
+      is_layout            = ls_layout
+    CHANGING
+      it_fieldcatalog      = t_Fcat
+      it_outtab            = gt_utf_api_aws.
+*      it_outtab            = <lt_alv_data>.
+
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  EXCLUDE_TB_FUNCTIONS
+*&---------------------------------------------------------------------*
+FORM exclude_tb_functions  CHANGING Ct_exclude TYPE ui_functions.
+
+  "To hide or exclude the buttons from application toolbar
+  DATA lv_exclude TYPE ui_func.
+
+  CLEAR: lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_check.         " Check button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_detail.         " Details button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_graph.             " Graph button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_copy.          " Copy button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_cut.           " Cut button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_insert_row.    " insert new record button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_copy_row.      " Copy row button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_delete_row.      " Delete row button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_append_row.      " Append row button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_paste.         " Paste button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_paste_new_row. " Paste new row button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_loc_undo.          " Undo button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_views .            " Views button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_view_grid.         " View grid button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_subtot.            " Subtotal button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_mb_sum.               " Subtotal button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_info.              " End user documentation button
+  APPEND lv_exclude TO ct_exclude.
+
+  CLEAR lv_exclude.
+  lv_exclude = cl_gui_alv_grid=>mc_fc_refresh.           " Refresh button
+  APPEND lv_exclude TO ct_exclude.
+
+ENDFORM.                                           "EXCLUDE_TB_FUNCTIONS
+
+
+*&---------------------------------------------------------------------*
+*&      Form  HANDLE_HOTSPOT_CLICK
+*&---------------------------------------------------------------------*
+FORM handle_hotspot_click  USING ps_rols_id TYPE lvc_s_row
+                                 ps_column TYPE lvc_s_col.
+
+  DATA: lt_output TYPE gtt_utf_api_aws.
+
+  lt_output = gt_utf_api_aws.
+*  gv_val = p_selfield-value.
+  gv_index = ps_rols_id-index.
+  gv_fld = ps_column-fieldname.
+
+  ASSIGN lt_output[ ps_rols_id-index ] TO FIELD-SYMBOL(<ls_output>).
+  IF sy-subrc = 0.
+    CASE ps_column-fieldname.
+      WHEN 'REQUEST'.
+*       PERFORM display_fi_document USING <ls_output>-bukrs <ls_output>-belnr <ls_output>-gjahr.
+        CALL SCREEN 9000.
+      WHEN 'RESPONSE'.
+        CALL SCREEN 9000.
+*        PERFORM display_customer USING <ls_output>-asl_number <ls_output>-asl_bukrs.
+      WHEN 'LIFNR'.
+*        PERFORM display_vendor USING <ls_output>-lifnr <ls_output>-bukrs.
+      WHEN OTHERS.
+    ENDCASE.
+  ENDIF.
+
+
+ENDFORM.                                           "HANDLE_HOTSPOT_CLICK
+
+*&---------------------------------------------------------------------*
+*&      Form  BUILD_FIELDCAT
+*&---------------------------------------------------------------------*
+FORM build_fieldcat CHANGING T_FCAT TYPE lvc_t_fcat.
+
+
+PERFORM fill_fcat USING: 'UUID'                 'UUID'               '20'  ' ',
+                         'MESSAGEID'            'MESSAGEID'          '20'  'X',
+                         'SENDER'               'SENDER'             '10'  ' ',
+                         'SCOPE'                'SCOPE'              '10'  ' ',
+                         'MESSAGEGROUPID'       'MESSAGE GROUPID'    '5'  ' ',
+                         'SCOPE_EXTENSION'      'SCOPE EXTENSION'    '5'  ' ',
+                         'MESSAGETYPE'          'MESSAGETYPE'        '5'  ' ',
+                         'KEYTYPE'              'KEYTYPE'             '5'  ' ',
+                         'DELETED'              ' DELETED'            '5'  ' ',
+                         'SENDER_UUID'          'SENDER_UUID'         '5'  ' ',
+                         'DELETE_UUID'          'DELETE_UUID'         '5'  ' ',
+                         'STATUS'               'STATUS'              '5'  ' ',
+                         'ERROR_TEXT'           'ERROR_TEXT'          '50'  ' ',
+                         'IDOC_STATUS_COUNTER'  'IDOC_STATUS_COUNTER' '5'  ' ',
+                         'CRDAT'                'CREATION DATE'       '10'  ' ',
+                         'CRTIM'                'CREATION TIME'       '8'  ' ',
+                         'CRNAM'                 'CR NAME'            '10'  ' ',
+                         'CHDAT'                 'CHANGD DATE'        '10'  ' ',
+                         'CHTIM'                 'CHANGD TIME'        '10'  ' ',
+                         'CHNAM'                 'CHANGED NAME'       '10'  ' ',
+                         'PARENT_UUID'           'PARENT_UUID'        '5'  ' ',
+                         'PROFILE_ID'             'PROFILE_ID'        '5'  ' ',
+                         'LRES'                   'LOGIC RESOURCE'    '5'  ' ',
+                         'ACTION'                 'ACTION'            '5'  ' ',
+                         'HTTP_CODE'              'HTTP_CODE'         '5'  ' ',
+                         'RESPONSE_TIME'          'RESPONSE_TIME'     '5'  ' ',
+                         'ERROR_CODE'             'ERROR_CODE'        '5'  ' ',
+                         'ERROR_REQUEST_ID'       'ERROR_REQUEST_ID'  '5'  ' ',
+                         'REQUEST'                'REQUEST'           '90'  'X',
+                         'RESPONSE'               'RESPONSE'          '80'  'X'.
+
+ENDFORM.
+
+FORM fill_fcat USING fname
+                     ftext
+                     iv_inp
+                     iv_inp2.
+
+     CLEAR w_fcat.
+  w_fcat-fieldname     = fname.
+  w_fcat-COLTEXT       = ftext.
+  w_fcat-outputlen     = iv_inp.
+  w_fcat-hotspot       = iv_inp2.
+
+  APPEND w_fcat TO t_fcat.
+
+ENDFORM.
+
+MODULE status_9000 OUTPUT.
+  SET PF-STATUS 'ZBASIC2'.
+
+  READ TABLE gt_utf_api_aws INTO DATA(w_aws) INDEX gv_index .
+  gv_uuid   = w_aws-uuid.
+  gv_mid    = w_aws-messageid.
+  gv_crdat  = w_aws-crdat.
+  gv_crnam  = w_aws-crnam.
+  gv_scope  = w_aws-scope.
+  gv_sender = w_aws-sender.
+  gv_mtype  = w_aws-messagetype.
+  gv_lres1  = w_aws-lres.
+  gv_action1 = w_aws-action.
+  gv_restim = w_aws-response_time.
+  gv_hcode  = w_aws-http_code.
+  IF gv_fld = 'REQUEST'.
+    json_string  = w_aws-request.
+    SET TITLEBAR 'ZREQUEST'.
+  ELSEIF
+    gv_fld = 'RESPONSE'.
+    json_string = w_aws-response.
+    SET TITLEBAR 'ZRESPONSE'.
+  ENDIF.
+
+  DATA: c_req  TYPE REF TO cl_gui_custom_container,
+        editor TYPE REF TO cl_gui_textedit.
+
+  CREATE OBJECT c_req
+    EXPORTING
+      container_name = 'C_REQ'.
+
+
+  CREATE OBJECT editor
+    EXPORTING
+      parent = c_req.
+
+
+  CALL TRANSFORMATION sjson2html
+  SOURCE XML json_string
+  RESULT XML DATA(lvc_html).
+
+  cl_abap_browser=>show_html(
+  html_string = cl_abap_codepage=>convert_from( lvc_html )
+  container = c_req  ).
+
+
+ENDMODULE.
+*
+**&---------------------------------------------------------------------*
+**&      Module  USER_COMMAND_9000  INPUT
+**&---------------------------------------------------------------------*
+**       text
+**----------------------------------------------------------------------*
+MODULE user_command_9000 INPUT.
+  CASE sy-ucomm.
+    WHEN 'E'.
+      LEAVE TO SCREEN 0.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+    WHEN OTHERS.
+      LEAVE TO SCREEN  0.
+
+  ENDCASE.
+ENDMODULE.
+                                         "BUILD_FIELDCAT
+
